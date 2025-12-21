@@ -1,0 +1,13 @@
+.confirm-modal {
+    max-width: 400px;
+}
+
+.confirm-message {
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.confirm-modal .modal-footer {
+    gap: 12px;
+}
