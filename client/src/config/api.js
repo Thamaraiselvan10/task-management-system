@@ -1,5 +1,6 @@
 // API configuration for production deployment
 const API_URL = import.meta.env.VITE_API_URL || '';
+console.log('🔌 API_URL configured as:', API_URL || '(empty string)');
 
 // Wrapper function for fetch that prepends API_URL
 export async function apiFetch(endpoint, options = {}) {
