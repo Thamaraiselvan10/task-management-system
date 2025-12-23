@@ -14,9 +14,6 @@ export default defineConfig(({ mode }) => {
                     changeOrigin: true
                 }
             }
-        },
-        define: {
-            'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || '')
         }
     }
 })
