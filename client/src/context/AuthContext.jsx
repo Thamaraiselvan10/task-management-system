@@ -26,8 +26,15 @@ export function AuthProvider({ children }) {
             });
 
             if (response.ok) {
-                const data = await response.json();
-                setUser(data.user);
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    setUser(data.user);
+                } else {
+                    // Received non-JSON response (likely HTML error page)
+                    console.warn('Received non-JSON response from /api/auth/me');
+                    logout();
+                }
             } else {
                 // Token invalid, clear it
                 logout();
@@ -49,7 +56,14 @@ export function AuthProvider({ children }) {
             body: JSON.stringify({ email, password })
         });
 
-        const data = await response.json();
+        const contentType = response.headers.get('content-type');
+        let data;
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            throw new Error('Server error: Received non-JSON response');
+        }
 
         if (!response.ok) {
             throw new Error(data.error || 'Login failed');

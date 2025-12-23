@@ -45,24 +45,29 @@ export default function AdminDashboard() {
                 fetch(`${API_URL}/api/users/staff`, { headers })
             ]);
 
-            if (statsRes.ok) {
-                const statsData = await statsRes.json();
-                setStats(statsData.stats);
-            }
+            const parseStep = async (res) => {
+                const contentType = res.headers.get('content-type');
+                if (res.ok && contentType && contentType.includes('application/json')) {
+                    return res.json();
+                }
+                return null;
+            };
 
-            if (tasksRes.ok) {
-                const tasksData = await tasksRes.json();
+            const [statsData, tasksData, staffData] = await Promise.all([
+                parseStep(statsRes),
+                parseStep(tasksRes),
+                parseStep(staffRes)
+            ]);
+
+            if (statsData) setStats(statsData.stats);
+            if (tasksData) {
                 // Sort by deadline (nearest first) by default
                 const sortedTasks = tasksData.tasks.sort((a, b) =>
                     new Date(a.deadline) - new Date(b.deadline)
                 );
                 setTasks(sortedTasks);
             }
-
-            if (staffRes.ok) {
-                const staffData = await staffRes.json();
-                setStaff(staffData.staff);
-            }
+            if (staffData) setStaff(staffData.staff);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -155,8 +160,13 @@ export default function AdminDashboard() {
                     setStaff(prev => prev.filter(s => s.id !== deleteConfirm.id));
                 }
             } else {
-                const data = await res.json();
-                alert(data.error || 'Failed to delete');
+                const contentType = res.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await res.json();
+                    alert(data.error || 'Failed to delete');
+                } else {
+                    alert('Failed to delete: Server returned unexpected response');
+                }
             }
         } catch (error) {
             console.error('Delete error:', error);

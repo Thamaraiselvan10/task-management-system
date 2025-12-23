@@ -38,6 +38,11 @@ app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/reports', reportRoutes);
 
+// 404 Handler for API routes
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: 'Endpoint not found' });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
