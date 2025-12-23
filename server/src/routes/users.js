@@ -24,13 +24,18 @@ router.get('/staff', authenticate, isAdmin, async (req, res) => {
 
 // POST /api/users - Create a new staff user (Admin only)
 router.post('/', authenticate, isAdmin, async (req, res) => {
+    console.log('📝 POST /api/users - Creating new staff member');
+    console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+
     try {
         const { name, email, password, designation } = req.body;
 
         if (!name || !email || !password) {
+            console.log('❌ Validation failed: Missing required fields');
             return res.status(400).json({ error: 'Name, email, and password are required.' });
         }
 
+        console.log('📝 Checking if email exists:', email);
         // Check if email already exists
         const existingUser = await pool.query(
             'SELECT id FROM users WHERE email = $1',
@@ -38,13 +43,16 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         );
 
         if (existingUser.rows.length > 0) {
+            console.log('❌ Email already in use:', email);
             return res.status(400).json({ error: 'Email already in use.' });
         }
 
+        console.log('📝 Hashing password...');
         // Hash password
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
+        console.log('📝 Inserting user into database...');
         // Create user
         const result = await pool.query(
             `INSERT INTO users (name, email, password_hash, role, designation) 
@@ -54,6 +62,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         );
 
         const newUser = result.rows[0];
+        console.log('✅ User created successfully:', newUser.id, newUser.email);
 
         // Send welcome email (non-blocking)
         sendEmail({
@@ -67,15 +76,18 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         <p><strong>Password:</strong> ${password}</p>
         <p>Please login and change your password.</p>
       `
-        }).catch(err => console.error('Failed to send welcome email:', err));
+        }).catch(err => console.error('📧 Failed to send welcome email:', err));
 
+        console.log('📝 Sending success response...');
         res.status(201).json({
             message: 'Staff member created successfully.',
             user: newUser
         });
+        console.log('✅ Response sent successfully');
     } catch (error) {
-        console.error('Error creating user:', error);
-        res.status(500).json({ error: 'Failed to create user.' });
+        console.error('❌ Error creating user:', error.message);
+        console.error('❌ Full error:', error);
+        res.status(500).json({ error: 'Failed to create user: ' + error.message });
     }
 });
 
