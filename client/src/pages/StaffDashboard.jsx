@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
-import DailyReportModal from '../components/DailyReportModal';
 import UpdateTaskModal from '../components/UpdateTaskModal';
 import './Dashboard.css';
 
@@ -10,9 +9,8 @@ export default function StaffDashboard() {
     const [tasks, setTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [reportSubmitted, setReportSubmitted] = useState(false);
-    const [showReportModal, setShowReportModal] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
+    const [taskView, setTaskView] = useState('active'); // 'active' or 'completed'
 
     // Filter states
     const [filters, setFilters] = useState({
@@ -23,13 +21,12 @@ export default function StaffDashboard() {
 
     useEffect(() => {
         fetchData();
-        checkTodayReport();
     }, []);
 
-    // Apply filters whenever tasks or filters change
+    // Apply filters whenever tasks, filters, or taskView change
     useEffect(() => {
         applyFilters();
-    }, [tasks, filters]);
+    }, [tasks, filters, taskView]);
 
     const fetchData = async () => {
         try {
@@ -55,13 +52,20 @@ export default function StaffDashboard() {
     const applyFilters = () => {
         let result = [...tasks];
 
+        // Filter by taskView first
+        if (taskView === 'active') {
+            result = result.filter(task => task.status !== 'Completed');
+        } else {
+            result = result.filter(task => task.status === 'Completed');
+        }
+
         // Filter by priority
         if (filters.priority !== 'all') {
             result = result.filter(task => task.priority === filters.priority);
         }
 
-        // Filter by status
-        if (filters.status !== 'all') {
+        // Filter by status (only apply if not in completed view)
+        if (filters.status !== 'all' && taskView === 'active') {
             result = result.filter(task => task.status === filters.status);
         }
 
@@ -101,26 +105,6 @@ export default function StaffDashboard() {
         setFilters({ priority: 'all', status: 'all', deadline: 'all' });
     };
 
-    const checkTodayReport = async () => {
-        try {
-            const res = await fetch(`${API_URL}/api/reports/check-today`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setReportSubmitted(data.submitted);
-            }
-        } catch (error) {
-            console.error('Failed to check report:', error);
-        }
-    };
-
-    const handleReportSubmitted = () => {
-        setShowReportModal(false);
-        setReportSubmitted(true);
-    };
-
     const handleTaskUpdated = () => {
         setSelectedTask(null);
         fetchData();
@@ -143,7 +127,20 @@ export default function StaffDashboard() {
         const inProgress = tasks.filter(t => t.status === 'In Progress').length;
         const completed = tasks.filter(t => t.status === 'Completed').length;
         const overdue = tasks.filter(t => isOverdue(t.deadline, t.status)).length;
-        return { pending, inProgress, completed, overdue };
+
+        const high = tasks.filter(t => t.priority === 'High').length;
+        const medium = tasks.filter(t => t.priority === 'Medium').length;
+        const low = tasks.filter(t => t.priority === 'Low').length;
+
+        return { pending, inProgress, completed, overdue, high, medium, low };
+    };
+
+    const getActiveTaskCount = () => {
+        return tasks.filter(t => t.status !== 'Completed').length;
+    };
+
+    const getCompletedTaskCount = () => {
+        return tasks.filter(t => t.status === 'Completed').length;
     };
 
     const hasActiveFilters = filters.priority !== 'all' || filters.status !== 'all' || filters.deadline !== 'all';
@@ -163,14 +160,6 @@ export default function StaffDashboard() {
         <div className="dashboard">
             <div className="dashboard-header">
                 <h2>Welcome, {user?.name}!</h2>
-                <div className="dashboard-actions">
-                    <button
-                        className={`btn ${reportSubmitted ? 'btn-success' : 'btn-primary'}`}
-                        onClick={() => setShowReportModal(true)}
-                    >
-                        {reportSubmitted ? '✓ Report Submitted' : 'Submit Daily Report'}
-                    </button>
-                </div>
             </div>
 
             {/* Stats Cards */}
@@ -199,58 +188,118 @@ export default function StaffDashboard() {
                 )}
             </div>
 
-            {/* Section Header */}
-            <div className="section-header">
+            {/* Priority Stats */}
+            <h4 style={{ margin: '20px 0 10px', color: 'var(--text-secondary)' }}>By Priority</h4>
+            <div className="stats-grid" style={{ marginBottom: '30px' }}>
+                <div className="stat-card" style={{ borderLeft: '4px solid #f87171' }}>
+                    <h3>{stats.high}</h3>
+                    <p>High Priority</p>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #fbbf24' }}>
+                    <h3>{stats.medium}</h3>
+                    <p>Medium Priority</p>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid #34d399' }}>
+                    <h3>{stats.low}</h3>
+                    <p>Low Priority</p>
+                </div>
+            </div>
+
+            {/* Section Header with Subtabs */}
+            <div className="section-header" style={{ marginBottom: '0' }}>
                 <h3>My Tasks</h3>
             </div>
 
-            {/* Task Filters */}
-            <div className="filters-bar">
-                <div className="filter-group">
-                    <label>Priority:</label>
-                    <select
-                        value={filters.priority}
-                        onChange={(e) => handleFilterChange('priority', e.target.value)}
-                    >
-                        <option value="all">All</option>
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
-                    </select>
-                </div>
-
-                <div className="filter-group">
-                    <label>Status:</label>
-                    <select
-                        value={filters.status}
-                        onChange={(e) => handleFilterChange('status', e.target.value)}
-                    >
-                        <option value="all">All</option>
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                    </select>
-                </div>
-
-                <div className="filter-group">
-                    <label>Deadline:</label>
-                    <select
-                        value={filters.deadline}
-                        onChange={(e) => handleFilterChange('deadline', e.target.value)}
-                    >
-                        <option value="all">All</option>
-                        <option value="overdue">Overdue</option>
-                        <option value="today">Today</option>
-                        <option value="week">This Week</option>
-                    </select>
-                </div>
-
-                {hasActiveFilters && (
-                    <button className="btn btn-secondary clear-filters" onClick={clearFilters}>
-                        Clear Filters
-                    </button>
-                )}
+            <div className="task-view-tabs" style={{
+                display: 'flex',
+                gap: '0',
+                marginBottom: '16px',
+                borderBottom: '2px solid var(--border-color)'
+            }}>
+                <button
+                    className={`task-view-tab ${taskView === 'active' ? 'active' : ''}`}
+                    onClick={() => setTaskView('active')}
+                    style={{
+                        padding: '12px 20px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: taskView === 'active' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                        marginBottom: '-2px',
+                        color: taskView === 'active' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        fontWeight: taskView === 'active' ? '600' : '400',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    Tasks ({getActiveTaskCount()})
+                </button>
+                <button
+                    className={`task-view-tab ${taskView === 'completed' ? 'active' : ''}`}
+                    onClick={() => setTaskView('completed')}
+                    style={{
+                        padding: '12px 20px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: taskView === 'completed' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                        marginBottom: '-2px',
+                        color: taskView === 'completed' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                        fontWeight: taskView === 'completed' ? '600' : '400',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    Completed ({getCompletedTaskCount()})
+                </button>
             </div>
+
+            {/* Task Filters - only show for active view */}
+            {taskView === 'active' && (
+                <div className="filters-bar">
+                    <div className="filter-group">
+                        <label>Priority:</label>
+                        <select
+                            value={filters.priority}
+                            onChange={(e) => handleFilterChange('priority', e.target.value)}
+                        >
+                            <option value="all">All</option>
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+
+                    <div className="filter-group">
+                        <label>Status:</label>
+                        <select
+                            value={filters.status}
+                            onChange={(e) => handleFilterChange('status', e.target.value)}
+                        >
+                            <option value="all">All</option>
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                        </select>
+                    </div>
+
+                    <div className="filter-group">
+                        <label>Deadline:</label>
+                        <select
+                            value={filters.deadline}
+                            onChange={(e) => handleFilterChange('deadline', e.target.value)}
+                        >
+                            <option value="all">All</option>
+                            <option value="overdue">Overdue</option>
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                        </select>
+                    </div>
+
+                    {hasActiveFilters && (
+                        <button className="btn btn-secondary clear-filters" onClick={clearFilters}>
+                            Clear Filters
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div className="card">
                 <table>
@@ -260,13 +309,14 @@ export default function StaffDashboard() {
                             <th>Priority</th>
                             <th>Status</th>
                             <th>Deadline</th>
+                            <th>Comment</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredTasks.length === 0 ? (
                             <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '40px' }}>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
                                     {hasActiveFilters ? 'No tasks match the filters.' : 'No tasks assigned to you yet.'}
                                 </td>
                             </tr>
@@ -291,6 +341,9 @@ export default function StaffDashboard() {
                                     </td>
                                     <td className={isOverdue(task.deadline, task.status) ? 'overdue' : ''}>
                                         {formatDate(task.deadline)}
+                                    </td>
+                                    <td style={{ maxWidth: '200px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                        {task.latest_comment || '-'}
                                     </td>
                                     <td>
                                         <button
@@ -347,13 +400,6 @@ export default function StaffDashboard() {
             </div>
 
             {/* Modals */}
-            {showReportModal && (
-                <DailyReportModal
-                    onClose={() => setShowReportModal(false)}
-                    onSubmitted={handleReportSubmitted}
-                />
-            )}
-
             {selectedTask && (
                 <UpdateTaskModal
                     task={selectedTask}

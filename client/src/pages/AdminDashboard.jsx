@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import CreateTaskModal from '../components/CreateTaskModal';
 import CreateStaffModal from '../components/CreateStaffModal';
+import ReassignTaskModal from '../components/ReassignTaskModal';
 import ConfirmModal from '../components/ConfirmModal';
 import './Dashboard.css';
 
@@ -17,6 +18,7 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('tasks');
     const [openMenuId, setOpenMenuId] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, title, type: 'task' | 'staff' }
+    const [reassignTask, setReassignTask] = useState(null); // task to reassign
 
     // Filter states
     const [filters, setFilters] = useState({
@@ -178,6 +180,11 @@ export default function AdminDashboard() {
 
     const handleTaskCreated = () => {
         setShowTaskModal(false);
+        fetchData();
+    };
+
+    const handleTaskReassigned = () => {
+        setReassignTask(null);
         fetchData();
     };
 
@@ -351,13 +358,14 @@ export default function AdminDashboard() {
                                 <th>Status</th>
                                 <th>Deadline</th>
                                 <th>Assigned To</th>
+                                <th>Staff Comments</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredTasks.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
                                         {hasActiveFilters ? 'No tasks match the filters.' : 'No tasks yet. Create your first task!'}
                                     </td>
                                 </tr>
@@ -386,13 +394,24 @@ export default function AdminDashboard() {
                                         <td>
                                             {task.assignees?.map(a => a.name).join(', ') || 'Unassigned'}
                                         </td>
+                                        <td style={{ maxWidth: '200px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            {task.latest_comment || '-'}
+                                        </td>
                                         <td>
-                                            <button
-                                                className="remove-link"
-                                                onClick={() => handleDeleteTask(task.id, task.title)}
-                                            >
-                                                Remove
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => setReassignTask(task)}
+                                                >
+                                                    Reassign
+                                                </button>
+                                                <button
+                                                    className="remove-link"
+                                                    onClick={() => handleDeleteTask(task.id, task.title)}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -427,6 +446,15 @@ export default function AdminDashboard() {
                                                 </button>
                                                 {openMenuId === task.id && (
                                                     <div className="mobile-menu-dropdown">
+                                                        <button
+                                                            className="mobile-menu-item"
+                                                            onClick={() => {
+                                                                setReassignTask(task);
+                                                                setOpenMenuId(null);
+                                                            }}
+                                                        >
+                                                            🔄 Reassign
+                                                        </button>
                                                         <button
                                                             className="mobile-menu-item delete"
                                                             onClick={() => handleDeleteTask(task.id, task.title)}
@@ -550,6 +578,15 @@ export default function AdminDashboard() {
                 <CreateStaffModal
                     onClose={() => setShowStaffModal(false)}
                     onCreated={handleStaffCreated}
+                />
+            )}
+
+            {reassignTask && (
+                <ReassignTaskModal
+                    task={reassignTask}
+                    staff={staff}
+                    onClose={() => setReassignTask(null)}
+                    onUpdated={handleTaskReassigned}
                 />
             )}
 

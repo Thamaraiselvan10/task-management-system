@@ -2,6 +2,7 @@ import express from 'express';
 import pool from '../config/db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
 import { sendEmail } from '../utils/email.js';
+import { getTaskAssignedEmailTemplate, getTaskCompletedEmailTemplate } from '../utils/emailTemplates.js';
 
 const router = express.Router();
 
@@ -18,7 +19,8 @@ router.get('/', authenticate, async (req, res) => {
           (SELECT json_agg(json_build_object('id', us.id, 'name', us.name, 'email', us.email))
            FROM task_assignments ta
            JOIN users us ON ta.user_id = us.id
-           WHERE ta.task_id = t.id) as assignees
+           WHERE ta.task_id = t.id) as assignees,
+          (SELECT tu.comment FROM task_updates tu WHERE tu.task_id = t.id AND tu.comment IS NOT NULL ORDER BY tu.created_at DESC LIMIT 1) as latest_comment
         FROM tasks t
         JOIN users u ON t.created_by = u.id
         ORDER BY t.deadline ASC, t.priority DESC
@@ -30,7 +32,8 @@ router.get('/', authenticate, async (req, res) => {
           (SELECT json_agg(json_build_object('id', us.id, 'name', us.name, 'email', us.email))
            FROM task_assignments ta2
            JOIN users us ON ta2.user_id = us.id
-           WHERE ta2.task_id = t.id) as assignees
+           WHERE ta2.task_id = t.id) as assignees,
+          (SELECT tu.comment FROM task_updates tu WHERE tu.task_id = t.id AND tu.comment IS NOT NULL ORDER BY tu.created_at DESC LIMIT 1) as latest_comment
         FROM tasks t
         JOIN users u ON t.created_by = u.id
         JOIN task_assignments ta ON t.id = ta.task_id
@@ -139,19 +142,20 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         );
 
         for (const assignee of assigneeEmails.rows) {
+            const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+            const emailHtml = getTaskAssignedEmailTemplate({
+                name: assignee.name,
+                title,
+                description,
+                priority,
+                deadline,
+                taskUrl: `${clientUrl}/tasks/${task.id}`
+            });
+
             sendEmail({
                 to: assignee.email,
                 subject: `New Task Assigned: ${title}`,
-                html: `
-          <h2>New Task Assigned</h2>
-          <p>Hello ${assignee.name},</p>
-          <p>You have been assigned a new task:</p>
-          <p><strong>Title:</strong> ${title}</p>
-          <p><strong>Priority:</strong> ${priority}</p>
-          <p><strong>Deadline:</strong> ${new Date(deadline).toLocaleDateString()}</p>
-          <p><strong>Description:</strong> ${description || 'No description'}</p>
-          <p>Please login to view the task details.</p>
-        `
+                html: emailHtml
             }).catch(err => console.error('Failed to send task notification:', err));
         }
 
@@ -184,6 +188,11 @@ router.put('/:id', authenticate, async (req, res) => {
         if (req.user.role === 'STAFF') {
             // Staff can only update status and add comments
             if (status) {
+                // Comment is mandatory for staff status updates
+                if (!comment || !comment.trim()) {
+                    return res.status(400).json({ error: 'Comment is required when updating task status.' });
+                }
+
                 // Verify staff is assigned
                 const assignment = await pool.query(
                     'SELECT id FROM task_assignments WHERE task_id = $1 AND user_id = $2',
@@ -203,7 +212,33 @@ router.put('/:id', authenticate, async (req, res) => {
                 await pool.query(`
           INSERT INTO task_updates (task_id, user_id, status_change, comment)
           VALUES ($1, $2, $3, $4)
-        `, [id, req.user.id, status, comment || null]);
+        `, [id, req.user.id, status, comment]);
+
+                // Send email to task creator (Admin) if task is completed
+                if (status === 'Completed') {
+                    const creatorResult = await pool.query(
+                        'SELECT email, name FROM users WHERE id = $1',
+                        [existingTask.rows[0].created_by]
+                    );
+
+                    if (creatorResult.rows.length > 0) {
+                        const creator = creatorResult.rows[0];
+                        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+                        const emailHtml = getTaskCompletedEmailTemplate({
+                            name: creator.name,
+                            title: existingTask.rows[0].title,
+                            completedBy: req.user.name,
+                            comment,
+                            taskUrl: `${clientUrl}/tasks/${id}`
+                        });
+
+                        sendEmail({
+                            to: creator.email,
+                            subject: `Task Completed: ${existingTask.rows[0].title}`,
+                            html: emailHtml
+                        }).catch(err => console.error('Failed to send completion email:', err));
+                    }
+                }
             }
         } else {
             // Admin can update everything
@@ -224,16 +259,59 @@ router.put('/:id', authenticate, async (req, res) => {
 
                 // Update assignees if provided
                 if (assignees && assignees.length > 0) {
+                    // Get current assignees to identify new ones
+                    const currentAssignments = await client.query(
+                        'SELECT user_id FROM task_assignments WHERE task_id = $1',
+                        [id]
+                    );
+                    const currentAssigneeIds = currentAssignments.rows.map(r => r.user_id);
+
                     await client.query('DELETE FROM task_assignments WHERE task_id = $1', [id]);
+
                     for (const userId of assignees) {
                         await client.query(`
               INSERT INTO task_assignments (task_id, user_id)
               VALUES ($1, $2)
             `, [id, userId]);
                     }
+
+                    // Identify new assignees
+                    const newAssigneeIds = assignees.filter(id => !currentAssigneeIds.includes(id));
+
+                    if (newAssigneeIds.length > 0) {
+                        // Send email to new assignees (non-blocking, after commit)
+                        // We'll store them to send after commit
+                        req.newAssignees = newAssigneeIds;
+                    }
                 }
 
                 await client.query('COMMIT');
+
+                // Send emails to new assignees
+                if (req.newAssignees && req.newAssignees.length > 0) {
+                    const newAssigneeEmails = await pool.query(
+                        'SELECT email, name FROM users WHERE id = ANY($1)',
+                        [req.newAssignees]
+                    );
+
+                    for (const assignee of newAssigneeEmails.rows) {
+                        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+                        const emailHtml = getTaskAssignedEmailTemplate({
+                            name: assignee.name,
+                            title: title || existingTask.rows[0].title,
+                            description: description || existingTask.rows[0].description,
+                            priority: priority || existingTask.rows[0].priority,
+                            deadline: deadline || existingTask.rows[0].deadline,
+                            taskUrl: `${clientUrl}/tasks/${id}`
+                        });
+
+                        sendEmail({
+                            to: assignee.email,
+                            subject: `New Task Assigned: ${title || existingTask.rows[0].title}`,
+                            html: emailHtml
+                        }).catch(err => console.error('Failed to send reassignment email:', err));
+                    }
+                }
             } catch (error) {
                 await client.query('ROLLBACK');
                 throw error;

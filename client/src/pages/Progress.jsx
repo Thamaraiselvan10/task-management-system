@@ -4,14 +4,14 @@ import './Progress.css';
 
 export default function Progress() {
     const { user, token, isAdmin } = useAuth();
-    const [staff, setStaff] = useState([]);
     const [selectedStaff, setSelectedStaff] = useState('all');
     const [progressData, setProgressData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [timeFilter, setTimeFilter] = useState('all'); // 'today', 'week', 'month', 'all'
 
     useEffect(() => {
         fetchData();
-    }, [selectedStaff]);
+    }, [selectedStaff, timeFilter]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -43,15 +43,40 @@ export default function Progress() {
     const processProgressData = (tasks) => {
         let filteredTasks = tasks;
 
-        // For staff view or when a specific staff is selected
-        if (!isAdmin) {
-            // Staff sees only their tasks
-            filteredTasks = tasks;
-        } else if (selectedStaff !== 'all') {
-            // Admin filtering by staff
+        // Staff filter (Admin only)
+        if (isAdmin && selectedStaff !== 'all') {
             filteredTasks = tasks.filter(task =>
                 task.assignees?.some(a => a.id === parseInt(selectedStaff))
             );
+        }
+
+        // Time filter
+        const now = new Date();
+        const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+
+        if (timeFilter === 'today') {
+            filteredTasks = filteredTasks.filter(t => {
+                const deadline = new Date(t.deadline);
+                return deadline >= startOfDay && deadline < new Date(startOfDay.getTime() + 86400000);
+            });
+        } else if (timeFilter === 'week') {
+            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+            startOfWeek.setHours(0, 0, 0, 0);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+            filteredTasks = filteredTasks.filter(t => {
+                const deadline = new Date(t.deadline);
+                return deadline >= startOfWeek && deadline < endOfWeek;
+            });
+        } else if (timeFilter === 'month') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+            filteredTasks = filteredTasks.filter(t => {
+                const deadline = new Date(t.deadline);
+                return deadline >= startOfMonth && deadline <= endOfMonth;
+            });
         }
 
         const total = filteredTasks.length;
@@ -77,7 +102,6 @@ export default function Progress() {
 
             const completedOnDay = filteredTasks.filter(t => {
                 if (t.status !== 'Completed') return false;
-                // Check if task was updated on this day (simplified - using deadline as proxy)
                 const taskDate = new Date(t.deadline);
                 taskDate.setHours(0, 0, 0, 0);
                 return taskDate >= date && taskDate < nextDay;
@@ -90,13 +114,6 @@ export default function Progress() {
             });
         }
 
-        // Priority breakdown
-        const byPriority = {
-            high: filteredTasks.filter(t => t.priority === 'High').length,
-            medium: filteredTasks.filter(t => t.priority === 'Medium').length,
-            low: filteredTasks.filter(t => t.priority === 'Low').length
-        };
-
         setProgressData({
             total,
             completed,
@@ -104,8 +121,7 @@ export default function Progress() {
             pending,
             overdue,
             completionRate,
-            last7Days,
-            byPriority
+            last7Days
         });
     };
 
@@ -140,17 +156,37 @@ export default function Progress() {
         <div className="progress-page">
             <div className="progress-header">
                 <h2>📊 Progress Overview</h2>
-                {isAdmin && (
-                    <div className="staff-filter">
-                        <label>View:</label>
-                        <select value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
-                            <option value="all">All Staff</option>
-                            {staff.map(s => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                        </select>
+                <div className="header-actions">
+                    <div className="time-filter">
+                        <button
+                            className={`filter-btn ${timeFilter === 'today' ? 'active' : ''}`}
+                            onClick={() => setTimeFilter('today')}
+                        >Today</button>
+                        <button
+                            className={`filter-btn ${timeFilter === 'week' ? 'active' : ''}`}
+                            onClick={() => setTimeFilter('week')}
+                        >Week</button>
+                        <button
+                            className={`filter-btn ${timeFilter === 'month' ? 'active' : ''}`}
+                            onClick={() => setTimeFilter('month')}
+                        >Month</button>
+                        <button
+                            className={`filter-btn ${timeFilter === 'all' ? 'active' : ''}`}
+                            onClick={() => setTimeFilter('all')}
+                        >All Time</button>
                     </div>
-                )}
+
+                    {isAdmin && (
+                        <div className="staff-filter">
+                            <select value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
+                                <option value="all">All Staff</option>
+                                {staff.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Completion Ring */}
@@ -216,54 +252,7 @@ export default function Progress() {
                 </div>
             </div>
 
-            {/* Priority Breakdown */}
-            <div className="chart-section">
-                <h3>Tasks by Priority</h3>
-                <div className="priority-bars">
-                    <div className="priority-bar-item">
-                        <div className="priority-info">
-                            <span className="priority-name high">High</span>
-                            <span className="priority-count">{progressData?.byPriority.high}</span>
-                        </div>
-                        <div className="priority-bar-bg">
-                            <div
-                                className="priority-bar high"
-                                style={{
-                                    width: `${progressData?.total ? (progressData.byPriority.high / progressData.total) * 100 : 0}%`
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <div className="priority-bar-item">
-                        <div className="priority-info">
-                            <span className="priority-name medium">Medium</span>
-                            <span className="priority-count">{progressData?.byPriority.medium}</span>
-                        </div>
-                        <div className="priority-bar-bg">
-                            <div
-                                className="priority-bar medium"
-                                style={{
-                                    width: `${progressData?.total ? (progressData.byPriority.medium / progressData.total) * 100 : 0}%`
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <div className="priority-bar-item">
-                        <div className="priority-info">
-                            <span className="priority-name low">Low</span>
-                            <span className="priority-count">{progressData?.byPriority.low}</span>
-                        </div>
-                        <div className="priority-bar-bg">
-                            <div
-                                className="priority-bar low"
-                                style={{
-                                    width: `${progressData?.total ? (progressData.byPriority.low / progressData.total) * 100 : 0}%`
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             {/* Summary Card */}
             <div className="summary-card">

@@ -11,6 +11,13 @@ export default function UpdateTaskModal({ task, onClose, onUpdated }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
+        // Validate comment is required
+        if (!comment.trim()) {
+            setError('Comment is required when updating task status.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -86,13 +93,14 @@ export default function UpdateTaskModal({ task, onClose, onUpdated }) {
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="comment">Add Comment (Optional)</label>
+                            <label htmlFor="comment">Add Comment *</label>
                             <textarea
                                 id="comment"
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
-                                placeholder="Add a progress note or comment..."
+                                placeholder="Add a progress note or comment (required)..."
                                 rows="3"
+                                required
                             />
                         </div>
                     </div>
@@ -104,7 +112,7 @@ export default function UpdateTaskModal({ task, onClose, onUpdated }) {
                         <button
                             type="submit"
                             className="btn btn-primary"
-                            disabled={loading}
+                            disabled={loading || !comment.trim()}
                         >
                             {loading ? 'Updating...' : 'Update Task'}
                         </button>

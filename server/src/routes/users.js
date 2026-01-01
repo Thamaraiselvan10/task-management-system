@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import pool from '../config/db.js';
 import { authenticate, isAdmin } from '../middleware/auth.js';
 import { sendEmail } from '../utils/email.js';
+import { getWelcomeEmailTemplate } from '../utils/emailTemplates.js';
 
 const router = express.Router();
 
@@ -65,17 +66,18 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
         console.log('✅ User created successfully:', newUser.id, newUser.email);
 
         // Send welcome email (non-blocking)
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+        const emailHtml = getWelcomeEmailTemplate({
+            name,
+            email,
+            password,
+            loginUrl: `${clientUrl}/login`
+        });
+
         sendEmail({
             to: email,
-            subject: 'Your Account Has Been Created',
-            html: `
-        <h2>Welcome to Task Management System</h2>
-        <p>Hello ${name},</p>
-        <p>Your account has been created by the administrator.</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Password:</strong> ${password}</p>
-        <p>Please login and change your password.</p>
-      `
+            subject: 'Welcome to Task Management System - Your Account Details',
+            html: emailHtml
         }).catch(err => console.error('📧 Failed to send welcome email:', err));
 
         console.log('📝 Sending success response...');
