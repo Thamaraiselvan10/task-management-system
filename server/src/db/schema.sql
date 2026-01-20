@@ -4,7 +4,7 @@
 -- Enable UUID extension (optional, using SERIAL for simplicity)
 -- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users Table
+-- Users Table --
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tasks Table
+-- Tasks Table --
 CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
