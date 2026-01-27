@@ -467,17 +467,17 @@ export default function AdminDashboard() {
                                             <span className={`badge badge-${task.priority.toLowerCase()}`}>
                                                 {task.priority}
                                             </span>
-                                            <div className="mobile-menu">
+                                            <div className="task-action-menu">
                                                 <button
-                                                    className="mobile-menu-btn"
+                                                    className="task-action-btn"
                                                     onClick={() => setOpenMenuId(openMenuId === task.id ? null : task.id)}
                                                 >
-                                                    ⋮
+                                                    ⚙️
                                                 </button>
                                                 {openMenuId === task.id && (
-                                                    <div className="mobile-menu-dropdown">
+                                                    <div className="task-action-dropdown">
                                                         <button
-                                                            className="mobile-menu-item"
+                                                            className="task-action-item"
                                                             onClick={() => {
                                                                 setReassignTask(task);
                                                                 setOpenMenuId(null);
@@ -486,7 +486,7 @@ export default function AdminDashboard() {
                                                             🔄 Reassign
                                                         </button>
                                                         <button
-                                                            className="mobile-menu-item delete"
+                                                            className="task-action-item delete"
                                                             onClick={() => handleDeleteTask(task.id, task.title)}
                                                         >
                                                             🗑️ Remove

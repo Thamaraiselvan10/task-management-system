@@ -327,28 +327,33 @@ table {
     position: relative;
 }
 
-/* Mobile Menu Dropdown */
-.mobile-menu {
+/* Task Action Menu (renamed from mobile-menu to avoid Layout.css conflict) */
+.task-action-menu {
     position: relative;
+    display: inline-block;
 }
 
-.mobile-menu-btn {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    font-size: 1.25rem;
+.task-action-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary) !important;
+    border: none !important;
+    color: white !important;
+    font-size: 0.85rem;
     cursor: pointer;
-    padding: 0.4rem 0.6rem;
+    padding: 0.35rem 0.5rem;
     border-radius: var(--radius-sm);
-    line-height: 1;
+    min-width: 32px;
+    min-height: 32px;
 }
 
-.mobile-menu-btn:hover {
-    background: var(--primary);
-    color: white;
+.task-action-btn:hover {
+    background: var(--primary-dark) !important;
+    transform: scale(1.05);
 }
 
-.mobile-menu-dropdown {
+.task-action-dropdown {
     position: absolute;
     top: 100%;
     right: 0;
@@ -361,7 +366,7 @@ table {
     overflow: hidden;
 }
 
-.mobile-menu-item {
+.task-action-item {
     display: block;
     width: 100%;
     padding: 0.75rem 1rem;
@@ -373,11 +378,11 @@ table {
     cursor: pointer;
 }
 
-.mobile-menu-item:hover {
+.task-action-item:hover {
     background: var(--bg-hover);
 }
 
-.mobile-menu-item.delete {
+.task-action-item.delete {
     color: var(--danger);
 }
 

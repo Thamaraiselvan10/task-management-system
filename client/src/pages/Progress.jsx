@@ -4,6 +4,7 @@ import './Progress.css';
 
 export default function Progress() {
     const { user, token, isAdmin } = useAuth();
+    const [staff, setStaff] = useState([]);
     const [selectedStaff, setSelectedStaff] = useState('all');
     const [progressData, setProgressData] = useState(null);
     const [loading, setLoading] = useState(true);

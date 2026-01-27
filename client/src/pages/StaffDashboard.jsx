@@ -168,7 +168,7 @@ export default function StaffDashboard() {
                     <h3>{tasks.length}</h3>
                     <p>Total Tasks</p>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card hide-mobile">
                     <h3>{stats.pending}</h3>
                     <p>Pending</p>
                 </div>

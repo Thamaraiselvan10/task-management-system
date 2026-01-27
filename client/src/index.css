@@ -507,6 +507,11 @@ tr:hover td {
     padding: 0.5rem 0.75rem;
   }
 
+  .stat-card.hide-mobile {
+    display: none !important;
+    flex: none !important;
+  }
+
   .stat-card h3 {
     font-size: 1.25rem;
     margin-bottom: 0.25rem;
@@ -545,6 +550,18 @@ tr:hover td {
 
   .card {
     padding: 1rem;
+  }
+
+  /* Hide elements on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Hide on mobile (wider breakpoint for stats) */
+@media (max-width: 900px) {
+  .hide-mobile {
+    display: none !important;
   }
 }
 
