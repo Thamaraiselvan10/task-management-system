@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function UpdateTaskModal({ task, onClose, onUpdated }) {
     const { token } = useAuth();
+    const toast = useToast();
     const [status, setStatus] = useState(task.status);
     const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
@@ -36,9 +38,11 @@ export default function UpdateTaskModal({ task, onClose, onUpdated }) {
                 throw new Error(data.error || 'Failed to update task');
             }
 
+            toast.success('Task updated successfully');
             onUpdated();
         } catch (err) {
             setError(err.message);
+            toast.error(err.message);
         } finally {
             setLoading(false);
         }

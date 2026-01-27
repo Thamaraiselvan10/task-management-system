@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './Login.css';
 
@@ -9,6 +10,7 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
+    const toast = useToast();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -22,9 +24,11 @@ export default function Login() {
             setError('');
             setLoading(true);
             await login(email, password);
+            toast.success('Welcome back!');
             navigate('/dashboard');
         } catch (err) {
             setError('Failed to log in. Please check your credentials.');
+            toast.error('Login failed. Please check your credentials.');
             console.error(err);
         } finally {
             setLoading(false);

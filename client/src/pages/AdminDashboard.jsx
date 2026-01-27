@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import CreateTaskModal from '../components/CreateTaskModal';
 import CreateStaffModal from '../components/CreateStaffModal';
 import ReassignTaskModal from '../components/ReassignTaskModal';
@@ -10,6 +11,7 @@ import './Dashboard.css';
 
 export default function AdminDashboard() {
     const { token } = useAuth();
+    const toast = useToast();
     const [stats, setStats] = useState(null);
     const [tasks, setTasks] = useState([]);
     const [filteredTasks, setFilteredTasks] = useState([]);
@@ -163,21 +165,23 @@ export default function AdminDashboard() {
             if (res.ok) {
                 if (deleteConfirm.type === 'task') {
                     setTasks(prev => prev.filter(t => t.id !== deleteConfirm.id));
+                    toast.success('Task deleted successfully');
                 } else {
                     setStaff(prev => prev.filter(s => s.id !== deleteConfirm.id));
+                    toast.success('Staff member removed successfully');
                 }
             } else {
                 const contentType = res.headers.get('content-type');
                 if (contentType && contentType.includes('application/json')) {
                     const data = await res.json();
-                    alert(data.error || 'Failed to delete');
+                    toast.error(data.error || 'Failed to delete');
                 } else {
-                    alert('Failed to delete: Server returned unexpected response');
+                    toast.error('Failed to delete: Server returned unexpected response');
                 }
             }
         } catch (error) {
             console.error('Delete error:', error);
-            alert('Failed to delete');
+            toast.error('Failed to delete');
         } finally {
             setDeleteConfirm(null);
         }
@@ -187,16 +191,19 @@ export default function AdminDashboard() {
         setShowTaskModal(false);
         setSelectedDate(null);
         fetchData();
+        toast.success('Task created successfully');
     };
 
     const handleTaskReassigned = () => {
         setReassignTask(null);
         fetchData();
+        toast.success('Task reassigned successfully');
     };
 
     const handleStaffCreated = () => {
         setShowStaffModal(false);
         fetchData();
+        toast.success('Staff member added successfully');
     };
 
     const handleDateSelect = (date) => {
@@ -489,6 +496,14 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                     </div>
+                                    {/* Task Description */}
+                                    {task.description && (
+                                        <p className="task-card-desc">
+                                            {task.description.length > 80
+                                                ? task.description.substring(0, 80) + '...'
+                                                : task.description}
+                                        </p>
+                                    )}
                                     <div className="task-card-body">
                                         <span className={`badge status-${task.status.toLowerCase().replace(' ', '-')}`}>
                                             {task.status}
