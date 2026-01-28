@@ -502,22 +502,55 @@ table {
         font-size: 1.1rem;
     }
 
-    /* Action buttons - 3 columns grid */
+    /* Action buttons - 4 columns grid for all buttons in one row */
     .dashboard-actions {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.4rem;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.3rem;
         width: 100%;
     }
 
     .dashboard-actions .btn {
-        font-size: 0.7rem;
-        padding: 0.5rem 0.25rem;
+        font-size: 0.65rem;
+        padding: 0.45rem 0.2rem;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     /* Hide button text icons on very small screens */
     .dashboard-actions .btn::before {
         display: none;
     }
+
+    /* Hide on mobile utility */
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* A3 Status Select */
+.status-select {
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-select:hover {
+    border-color: var(--primary);
+}
+
+.status-select.status-pending {
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #fbbf24;
+}
+
+.status-select.status-completed {
+    border-color: rgba(52, 211, 153, 0.5);
+    color: #34d399;
 }

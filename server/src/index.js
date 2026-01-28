@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import taskRoutes from './routes/tasks.js';
 import reportRoutes from './routes/reports.js';
+import a3Routes from './routes/a3.js';
 import pool from './config/db.js';
 
 const app = express();
@@ -25,7 +26,7 @@ app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         if (allowedOrigins.indexOf(origin) !== -1 || origin === clientUrl) {
             callback(null, true);
         } else {
@@ -63,6 +64,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/a3', a3Routes);
 
 // 404 Handler for API routes
 app.use('/api/*', (req, res) => {

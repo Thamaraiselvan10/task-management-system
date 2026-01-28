@@ -3,6 +3,7 @@ import { useAuth, API_URL } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import CreateTaskModal from '../components/CreateTaskModal';
 import CreateStaffModal from '../components/CreateStaffModal';
+import CreateA3Modal from '../components/CreateA3Modal';
 import ReassignTaskModal from '../components/ReassignTaskModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CalendarModal from '../components/CalendarModal';
@@ -24,8 +25,12 @@ export default function AdminDashboard() {
     const [selectedDate, setSelectedDate] = useState(null);
     const [activeTab, setActiveTab] = useState('tasks');
     const [openMenuId, setOpenMenuId] = useState(null);
-    const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, title, type: 'task' | 'staff' }
+    const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, title, type: 'task' | 'staff' | 'a3' }
     const [reassignTask, setReassignTask] = useState(null); // task to reassign
+
+    // A3 states
+    const [a3Items, setA3Items] = useState([]);
+    const [showA3Modal, setShowA3Modal] = useState(false);
 
     // Filter states
     const [filters, setFilters] = useState({
@@ -48,10 +53,11 @@ export default function AdminDashboard() {
         try {
             const headers = { 'Authorization': `Bearer ${token}` };
 
-            const [statsRes, tasksRes, staffRes] = await Promise.all([
+            const [statsRes, tasksRes, staffRes, a3Res] = await Promise.all([
                 fetch(`${API_URL}/api/tasks/stats/overview`, { headers }),
                 fetch(`${API_URL}/api/tasks`, { headers }),
-                fetch(`${API_URL}/api/users/staff`, { headers })
+                fetch(`${API_URL}/api/users/staff`, { headers }),
+                fetch(`${API_URL}/api/a3`, { headers })
             ]);
 
             const parseStep = async (res) => {
@@ -62,10 +68,11 @@ export default function AdminDashboard() {
                 return null;
             };
 
-            const [statsData, tasksData, staffData] = await Promise.all([
+            const [statsData, tasksData, staffData, a3Data] = await Promise.all([
                 parseStep(statsRes),
                 parseStep(tasksRes),
-                parseStep(staffRes)
+                parseStep(staffRes),
+                parseStep(a3Res)
             ]);
 
             if (statsData) setStats(statsData.stats);
@@ -77,6 +84,7 @@ export default function AdminDashboard() {
                 setTasks(sortedTasks);
             }
             if (staffData) setStaff(staffData.staff);
+            if (a3Data) setA3Items(a3Data.a3_items);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -149,13 +157,22 @@ export default function AdminDashboard() {
         setOpenMenuId(null);
     };
 
+    const handleDeleteA3 = (a3Id, a3Name) => {
+        setDeleteConfirm({ id: a3Id, title: a3Name, type: 'a3' });
+    };
+
     const confirmDelete = async () => {
         if (!deleteConfirm) return;
 
         try {
-            const endpoint = deleteConfirm.type === 'task'
-                ? `${API_URL}/api/tasks/${deleteConfirm.id}`
-                : `${API_URL}/api/users/${deleteConfirm.id}`;
+            let endpoint;
+            if (deleteConfirm.type === 'task') {
+                endpoint = `${API_URL}/api/tasks/${deleteConfirm.id}`;
+            } else if (deleteConfirm.type === 'a3') {
+                endpoint = `${API_URL}/api/a3/${deleteConfirm.id}`;
+            } else {
+                endpoint = `${API_URL}/api/users/${deleteConfirm.id}`;
+            }
 
             const res = await fetch(endpoint, {
                 method: 'DELETE',
@@ -166,6 +183,9 @@ export default function AdminDashboard() {
                 if (deleteConfirm.type === 'task') {
                     setTasks(prev => prev.filter(t => t.id !== deleteConfirm.id));
                     toast.success('Task deleted successfully');
+                } else if (deleteConfirm.type === 'a3') {
+                    setA3Items(prev => prev.filter(a => a.id !== deleteConfirm.id));
+                    toast.success('A3 deleted successfully');
                 } else {
                     setStaff(prev => prev.filter(s => s.id !== deleteConfirm.id));
                     toast.success('Staff member removed successfully');
@@ -204,6 +224,12 @@ export default function AdminDashboard() {
         setShowStaffModal(false);
         fetchData();
         toast.success('Staff member added successfully');
+    };
+
+    const handleA3Created = () => {
+        setShowA3Modal(false);
+        fetchData();
+        toast.success('A3 created successfully');
     };
 
     const handleDateSelect = (date) => {
@@ -262,6 +288,14 @@ export default function AdminDashboard() {
                     <button className="btn btn-secondary" onClick={() => setShowStaffModal(true)}>
                         + Add Staff
                     </button>
+                    <button
+                        className="btn btn-primary"
+                        onClick={() => setShowA3Modal(true)}
+                        disabled={staff.length === 0}
+                        title={staff.length === 0 ? 'Add staff first before creating A3' : 'Create a new A3'}
+                    >
+                        + Create A3
+                    </button>
                 </div>
             </div>
 
@@ -309,6 +343,12 @@ export default function AdminDashboard() {
                     onClick={() => setActiveTab('staff')}
                 >
                     Staff ({staff.length})
+                </button>
+                <button
+                    className={`tab ${activeTab === 'a3' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('a3')}
+                >
+                    A3 ({a3Items.length})
                 </button>
             </div>
 
@@ -603,6 +643,107 @@ export default function AdminDashboard() {
                 </div>
             )}
 
+            {/* A3 Table */}
+            {activeTab === 'a3' && (
+                <div className="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Assigned To</th>
+                                <th>Comment</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {a3Items.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                                        No A3 items yet. Create your first A3!
+                                    </td>
+                                </tr>
+                            ) : (
+                                a3Items.map(a3 => (
+                                    <tr key={a3.id}>
+                                        <td><strong>{a3.name}</strong></td>
+                                        <td style={{ fontWeight: '600', color: 'var(--primary)' }}>
+                                            ₹{Number(a3.amount).toLocaleString('en-IN')}
+                                        </td>
+                                        <td>
+                                            <span className={`badge status-${a3.status.toLowerCase()}`}>
+                                                {a3.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {a3.assignees?.map(a => a.name).join(', ') || 'Unassigned'}
+                                        </td>
+                                        <td style={{ maxWidth: '200px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            {a3.comment || '-'}
+                                        </td>
+                                        <td>{formatDate(a3.created_at)}</td>
+                                        <td>
+                                            <button
+                                                className="remove-link"
+                                                onClick={() => handleDeleteA3(a3.id, a3.name)}
+                                            >
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+
+                    {/* Mobile A3 Cards */}
+                    <div className="task-cards">
+                        {a3Items.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                                No A3 items yet. Create your first A3!
+                            </div>
+                        ) : (
+                            a3Items.map(a3 => (
+                                <div key={a3.id} className="task-card-item">
+                                    <div className="task-card-header">
+                                        <span className="task-card-title">{a3.name}</span>
+                                        <span className={`badge status-${a3.status.toLowerCase()}`}>
+                                            {a3.status}
+                                        </span>
+                                    </div>
+                                    <div className="task-card-body" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--primary)' }}>
+                                            ₹{Number(a3.amount).toLocaleString('en-IN')}
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                            → {a3.assignees?.map(a => a.name).join(', ') || 'Unassigned'}
+                                        </span>
+                                        {a3.comment && (
+                                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                                "{a3.comment}"
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="task-card-footer">
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            Created: {formatDate(a3.created_at)}
+                                        </span>
+                                        <button
+                                            className="btn btn-danger btn-sm"
+                                            onClick={() => handleDeleteA3(a3.id, a3.name)}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Modals */}
             {showTaskModal && (
                 <CreateTaskModal
@@ -623,6 +764,14 @@ export default function AdminDashboard() {
                 />
             )}
 
+            {showA3Modal && (
+                <CreateA3Modal
+                    staff={staff}
+                    onClose={() => setShowA3Modal(false)}
+                    onCreated={handleA3Created}
+                />
+            )}
+
             {reassignTask && (
                 <ReassignTaskModal
                     task={reassignTask}
@@ -634,7 +783,7 @@ export default function AdminDashboard() {
 
             {deleteConfirm && (
                 <ConfirmModal
-                    title={`Delete ${deleteConfirm.type === 'task' ? 'Task' : 'Staff'}`}
+                    title={`Delete ${deleteConfirm.type === 'task' ? 'Task' : deleteConfirm.type === 'a3' ? 'A3' : 'Staff'}`}
                     message={`Are you sure you want to delete "${deleteConfirm.title}"? This action cannot be undone.`}
                     onConfirm={confirmDelete}
                     onCancel={() => setDeleteConfirm(null)}
