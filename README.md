@@ -46,7 +46,7 @@ Start the server:
 npm run dev
 ```
 
-### 3. Setup Frontend
+### 3. Setup Front-end
 
 ```bash
 cd client
