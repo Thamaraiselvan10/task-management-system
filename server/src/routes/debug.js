@@ -1,74 +1,103 @@
 import express from 'express';
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+import { promisify } from 'util';
 
 const router = express.Router();
+const resolveDns = promisify(dns.resolve);
 
 router.get('/', async (req, res) => {
+    let logs = [];
+    const log = (msg) => {
+        console.log(msg);
+        logs.push(`${new Date().toISOString().split('T')[1].slice(0, -1)} - ${msg}`);
+    };
+
     try {
+        log('Starting Comprehensive Email Diagnostic...');
+
         const user = process.env.SMTP_USER;
         const pass = process.env.SMTP_PASS;
-        // Try Port 465 (SSL) as it's often more reliable on cloud
         const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-        const port = 465;
-
-        let status = `<h3>Configuration Check (Attempting Port 465 SSL)</h3>
-        <ul>
-            <li><strong>SMTP_USER:</strong> ${user ? user : '❌ MISSING'}</li>
-            <li><strong>SMTP_PASS:</strong> ${pass ? '✅ SET (' + pass.length + ' chars)' : '❌ MISSING'}</li>
-            <li><strong>SMTP_HOST:</strong> ${host}</li>
-            <li><strong>SMTP_PORT:</strong> ${port} (Forced SSL)</li>
-        </ul>`;
 
         if (!user || !pass) {
-            return res.send(status + '<h3>❌ Error: Missing Credentials</h3>');
+            throw new Error('Missing SMTP_USER or SMTP_PASS environment variables');
         }
 
-        const transporter = nodemailer.createTransport({
-            host,
-            port,
-            secure: true, // true for 465
-            auth: { user, pass },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 10000
-        });
+        // 1. DNS Check
+        log(`1. Resolving DNS for ${host}...`);
+        try {
+            const addresses = await resolveDns(host);
+            log(`✅ DNS Resolved: ${JSON.stringify(addresses)}`);
+        } catch (dnsErr) {
+            log(`❌ DNS Lookup Failed: ${dnsErr.message}`);
+            // Proceed anyway, maybe it works with cached IP
+        }
 
-        status += '<h3>Connection Test</h3>';
+        // 2. Test Ports Sequentially
+        const portsToTest = [
+            { port: 587, secure: false, name: 'STARTTLS (587)' },
+            { port: 465, secure: true, name: 'SSL (465)' }
+        ];
 
-        // Wrap verify in a timeout promise
-        const verifyPromise = new Promise((resolve, reject) => {
-            transporter.verify((err, success) => {
-                if (err) reject(err);
-                else resolve(success);
+        let successTransporter = null;
+
+        for (const config of portsToTest) {
+            log(`\n2. Testing ${config.name}...`);
+
+            const transporter = nodemailer.createTransport({
+                host,
+                port: config.port,
+                secure: config.secure,
+                auth: { user, pass },
+                connectionTimeout: 5000, // 5s timeout
+                greetingTimeout: 5000,
+                socketTimeout: 5000,
+                // FORCE IPv4 (Fixes common cloud timeout issues with IPv6)
+                tls: {
+                    rejectUnauthorized: false
+                }
             });
-        });
 
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Connection timed out after 10 seconds. Check if Render is blocking outbound mail ports.')), 10000)
-        );
+            try {
+                await new Promise((resolve, reject) => {
+                    transporter.verify((err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+                log(`✅ SUCCESS: Connected via ${config.name}!`);
+                successTransporter = transporter;
+                break; // Stop after first success
+            } catch (err) {
+                log(`❌ FAILED ${config.name}: ${err.message}`);
+                if (err.code === 'EAUTH') {
+                    log('   -> Auth Error: Check Email/Password.');
+                    break; // Don't retry other ports if auth is wrong
+                }
+            }
+        }
 
-        await Promise.race([verifyPromise, timeoutPromise]);
-        status += '<p>✅ SMTP Connection Verified!</p>';
+        if (!successTransporter) {
+            throw new Error('All connection attempts failed.');
+        }
 
-        const info = await transporter.sendMail({
-            from: `"Debug Test" <${user}>`,
+        // 3. Send Email
+        log('\n3. Sending Test Email...');
+        const info = await successTransporter.sendMail({
+            from: `"Debug Diagnostic" <${user}>`,
             to: user,
-            subject: 'Render Production Email Test (SSL)',
-            text: 'It works! Connected via Port 465 SSL.',
-            html: '<b>It works!</b> Connected via Port 465 SSL.'
+            subject: 'Render Production Email Diagnostic',
+            text: 'If you received this, the diagnostic was successful.\n\nLogs:\n' + logs.join('\n'),
+            html: `<h3>✅ Diagnostic Successful</h3><pre>${logs.join('\n')}</pre>`
         });
 
-        status += `<p>✅ Email Sent Successfully!</p>
-        <p>Message ID: ${info.messageId}</p>`;
-
-        res.send(status);
+        log(`✅ Email Sent! ID: ${info.messageId}`);
+        res.send(`<h3>✅ SUCCESS</h3><pre>${logs.join('\n')}</pre>`);
 
     } catch (error) {
-        console.error('Debug Email Error:', error);
-        res.status(500).send(`<h3>❌ FAILED</h3>
-        <p><strong>Error:</strong> ${error.message}</p>
-        <p><strong>Code:</strong> ${error.code || 'N/A'}</p>
-        <pre>${error.stack}</pre>`);
+        log(`\n❌ CRITICAL ERROR: ${error.message}`);
+        res.status(500).send(`<h3>❌ FAILED</h3><pre>${logs.join('\n')}\n\nStack: ${error.stack}</pre>`);
     }
 });
 
