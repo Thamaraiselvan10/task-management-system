@@ -9,15 +9,15 @@ let transporter = null;
 const getTransporter = () => {
     if (!transporter && process.env.SMTP_USER && process.env.SMTP_PASS) {
         transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT) || 465,
-            secure: true, // Use SSL
+            service: 'gmail',
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
             },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000
+            // Increase timeouts to handle slow cloud networks
+            connectionTimeout: 20000,
+            greetingTimeout: 20000,
+            socketTimeout: 20000
         });
     }
     return transporter;
