@@ -164,6 +164,11 @@ export default function StaffDashboard() {
     const hasActiveFilters = filters.priority !== 'all' || filters.status !== 'all' || filters.deadline !== 'all';
 
     const handleA3Complete = async (a3Id, comment) => {
+        if (!a3Id) {
+            toast.error('Error: Invalid A3 ID');
+            return;
+        }
+
         try {
             const res = await fetch(`${API_URL}/api/a3/${a3Id}`, {
                 method: 'PUT',
