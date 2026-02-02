@@ -10,12 +10,14 @@ const getTransporter = () => {
     if (!transporter && process.env.SMTP_USER && process.env.SMTP_PASS) {
         transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT) || 587,
-            secure: false,
+            port: parseInt(process.env.SMTP_PORT) || 465,
+            secure: true, // Use SSL
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
-            }
+            },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000
         });
     }
     return transporter;
