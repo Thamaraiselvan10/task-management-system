@@ -63,8 +63,11 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/report', reportRoutes); // Note: Original was reportRoutes, keeping consistent if typo existed or using correct path
 app.use('/api/reports', reportRoutes);
 app.use('/api/a3', a3Routes);
+import debugRoutes from './routes/debug.js';
+app.use('/api/debug', debugRoutes);
 
 // 404 Handler for API routes
 app.use('/api/*', (req, res) => {
