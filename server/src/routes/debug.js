@@ -1,6 +1,6 @@
 import express from 'express';
-import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
+import { Buffer } from 'buffer';
 
 const router = express.Router();
 const OAuth2 = google.auth.OAuth2;
@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     };
 
     try {
-        log('Starting Gmail OAuth2 Diagnostic...');
+        log('Starting Gmail REST API Diagnostic (HTTP Mode)...');
 
         const clientId = process.env.GMAIL_CLIENT_ID?.trim();
         const clientSecret = process.env.GMAIL_CLIENT_SECRET?.trim();
@@ -24,13 +24,11 @@ router.get('/', async (req, res) => {
             throw new Error('Missing Gmail OAuth credentials in .env');
         }
 
-        log(`Client ID: "${clientId.slice(0, 5)}...${clientId.slice(-5)}" (Length: ${clientId.length})`);
-        log(`Client Secret: "${clientSecret.slice(0, 3)}...${clientSecret.slice(-3)}" (Length: ${clientSecret.length})`);
-        log(`Refresh Token: "${refreshToken.slice(0, 5)}...${refreshToken.slice(-5)}" (Length: ${refreshToken.length})`);
+        log(`Client ID: "${clientId.slice(0, 5)}...${clientId.slice(-5)}"`);
         log(`User: ${user}`);
 
-        // 1. Get Access Token
-        log('1. Fetching Access Token from Google...');
+        // 1. Setup Client
+        log('1. Setting up Google Client...');
         const oauth2Client = new OAuth2(
             clientId,
             clientSecret,
@@ -41,48 +39,40 @@ router.get('/', async (req, res) => {
             refresh_token: refreshToken
         });
 
-        const accessToken = await new Promise((resolve, reject) => {
-            oauth2Client.getAccessToken((err, token) => {
-                if (err) {
-                    log(`❌ Access Token Error: ${err.message}`);
-                    reject(err);
-                } else {
-                    log('✅ Access Token Generated!');
-                    resolve(token);
-                }
-            });
-        });
+        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-        // 2. Configure Nodemailer
-        log('2. Configuring Transport...');
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                type: 'OAuth2',
-                user: user,
-                clientId: clientId,
-                clientSecret: clientSecret,
-                refreshToken: refreshToken,
-                accessToken: accessToken
+        // 2. Prepare Email
+        log('2. Preparing raw email content...');
+        const makeBody = (to, from, subject, message) => {
+            const str = [
+                `To: ${to}`,
+                `From: ${from}`,
+                `Subject: ${subject}`,
+                `MIME-Version: 1.0`,
+                `Content-Type: text/html; charset=utf-8`,
+                ``,
+                message
+            ].join('\n');
+
+            return Buffer.from(str)
+                .toString('base64')
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        };
+
+        const raw = makeBody(user, `"Gmail Debug" <${user}>`, 'Render Production Email (REST API)', '<h3>✅ It works!</h3><p>This email was sent via Gmail REST API (Port 443).</p>');
+
+        // 3. Send
+        log('3. Sending via HTTP (users.messages.send)...');
+        const response = await gmail.users.messages.send({
+            userId: 'me',
+            requestBody: {
+                raw: raw
             }
         });
 
-        // 3. Verify
-        log('3. Verifying SMTP Connection...');
-        await transporter.verify();
-        log('✅ Connection Verified!');
-
-        // 4. Send Email
-        log('4. Sending Test Email...');
-        const info = await transporter.sendMail({
-            from: `"Gmail OAuth Debug" <${user}>`,
-            to: user, // Send to self
-            subject: 'Render Production Email (Gmail API)',
-            text: 'If you see this, Gmail OAuth2 is working perfectly via API!',
-            html: '<h3>✅ Gmail OAuth2 Works!</h3><p>Your app is now authenticated directly with Google.</p>'
-        });
-
-        log(`✅ Email Sent! ID: ${info.messageId}`);
+        log(`✅ Email Sent! ID: ${response.data.id}`);
         res.send(`<h3>✅ SUCCESS</h3><pre>${logs.join('\n')}</pre>`);
 
     } catch (error) {

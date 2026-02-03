@@ -1,73 +1,65 @@
-import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
+import { Buffer } from 'buffer';
 
 dotenv.config();
 
 const OAuth2 = google.auth.OAuth2;
 
-const createTransporter = async () => {
-    try {
-        const oauth2Client = new OAuth2(
-            process.env.GMAIL_CLIENT_ID?.trim(),
-            process.env.GMAIL_CLIENT_SECRET?.trim(),
-            "https://developers.google.com/oauthplayground"
-        );
+const createGmailClient = () => {
+    const oauth2Client = new OAuth2(
+        process.env.GMAIL_CLIENT_ID?.trim(),
+        process.env.GMAIL_CLIENT_SECRET?.trim(),
+        "https://developers.google.com/oauthplayground"
+    );
 
-        oauth2Client.setCredentials({
-            refresh_token: process.env.GMAIL_REFRESH_TOKEN?.trim()
-        });
+    oauth2Client.setCredentials({
+        refresh_token: process.env.GMAIL_REFRESH_TOKEN?.trim()
+    });
 
-        const accessToken = await new Promise((resolve, reject) => {
-            oauth2Client.getAccessToken((err, token) => {
-                if (err) {
-                    console.error('❌ Failed to create access token:', err);
-                    reject(err);
-                }
-                resolve(token);
-            });
-        });
+    return google.gmail({ version: 'v1', auth: oauth2Client });
+};
 
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                type: 'OAuth2',
-                user: process.env.EMAIL_USER?.trim(),
-                clientId: process.env.GMAIL_CLIENT_ID?.trim(),
-                clientSecret: process.env.GMAIL_CLIENT_SECRET?.trim(),
-                refreshToken: process.env.GMAIL_REFRESH_TOKEN?.trim(),
-                accessToken: accessToken || '' // Sometimes redundant but good for debug
-            }
-        });
+const makeBody = (to, from, subject, message) => {
+    const str = [
+        `To: ${to}`,
+        `From: ${from}`,
+        `Subject: ${subject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: text/html; charset=utf-8`,
+        ``,
+        message
+    ].join('\n');
 
-        return transporter;
-    } catch (error) {
-        console.error('❌ Error creating OAuth2 transporter:', error);
-        return null;
-    }
+    return Buffer.from(str)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
 };
 
 export const sendEmail = async ({ to, subject, html, text }) => {
     try {
-        const transporter = await createTransporter();
+        const gmail = createGmailClient();
+        const user = process.env.EMAIL_USER?.trim();
 
-        if (!transporter) {
-            throw new Error('Failed to create email transporter');
+        if (!user) {
+            throw new Error('EMAIL_USER is not defined in .env');
         }
 
-        const mailOptions = {
-            from: `"Task Management System" <${process.env.EMAIL_USER}>`,
-            to,
-            subject,
-            text: text || '',
-            html: html || text
-        };
+        const raw = makeBody(to, `"Task Management System" <${user}>`, subject, html || text);
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Email sent via Gmail OAuth2:', info.messageId);
-        return info;
+        const response = await gmail.users.messages.send({
+            userId: 'me',
+            requestBody: {
+                raw: raw
+            }
+        });
+
+        console.log('✅ Email sent via Gmail REST API:', response.data.id);
+        return response.data;
     } catch (error) {
-        console.error('❌ Failed to send email:', error);
+        console.error('❌ Failed to send email via REST API:', error.message);
         throw error;
     }
 };
