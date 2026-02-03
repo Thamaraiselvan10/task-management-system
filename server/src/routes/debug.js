@@ -15,10 +15,10 @@ router.get('/', async (req, res) => {
     try {
         log('Starting Gmail OAuth2 Diagnostic...');
 
-        const clientId = process.env.GMAIL_CLIENT_ID;
-        const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-        const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
-        const user = process.env.EMAIL_USER;
+        const clientId = process.env.GMAIL_CLIENT_ID?.trim();
+        const clientSecret = process.env.GMAIL_CLIENT_SECRET?.trim();
+        const refreshToken = process.env.GMAIL_REFRESH_TOKEN?.trim();
+        const user = process.env.EMAIL_USER?.trim();
 
         if (!clientId || !clientSecret || !refreshToken || !user) {
             throw new Error('Missing Gmail OAuth credentials in .env');

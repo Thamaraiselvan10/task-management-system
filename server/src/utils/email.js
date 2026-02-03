@@ -9,13 +9,13 @@ const OAuth2 = google.auth.OAuth2;
 const createTransporter = async () => {
     try {
         const oauth2Client = new OAuth2(
-            process.env.GMAIL_CLIENT_ID,
-            process.env.GMAIL_CLIENT_SECRET,
+            process.env.GMAIL_CLIENT_ID?.trim(),
+            process.env.GMAIL_CLIENT_SECRET?.trim(),
             "https://developers.google.com/oauthplayground"
         );
 
         oauth2Client.setCredentials({
-            refresh_token: process.env.GMAIL_REFRESH_TOKEN
+            refresh_token: process.env.GMAIL_REFRESH_TOKEN?.trim()
         });
 
         const accessToken = await new Promise((resolve, reject) => {
@@ -32,10 +32,10 @@ const createTransporter = async () => {
             service: 'gmail',
             auth: {
                 type: 'OAuth2',
-                user: process.env.EMAIL_USER,
-                clientId: process.env.GMAIL_CLIENT_ID,
-                clientSecret: process.env.GMAIL_CLIENT_SECRET,
-                refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+                user: process.env.EMAIL_USER?.trim(),
+                clientId: process.env.GMAIL_CLIENT_ID?.trim(),
+                clientSecret: process.env.GMAIL_CLIENT_SECRET?.trim(),
+                refreshToken: process.env.GMAIL_REFRESH_TOKEN?.trim(),
                 accessToken: accessToken || '' // Sometimes redundant but good for debug
             }
         });
