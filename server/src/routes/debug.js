@@ -1,5 +1,5 @@
 import express from 'express';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 const router = express.Router();
 
@@ -7,65 +7,48 @@ router.get('/', async (req, res) => {
     let logs = [];
     const log = (msg) => {
         console.log(msg);
-        logs.push(`${new Date().toISOString().split('T')[1].slice(0, -1)} - ${msg}`);
+        logs.push(msg);
     };
 
     try {
-        log('Starting Debug (Attempt: service="gmail")...');
+        log('Starting Resend API Diagnostic...');
 
-        const user = process.env.SMTP_USER;
-        const pass = process.env.SMTP_PASS;
+        const apiKey = process.env.RESEND_API_KEY;
 
-        if (!user || !pass) {
-            throw new Error('Missing SMTP_USER or SMTP_PASS environment variables');
+        if (!apiKey) {
+            throw new Error('Missing RESEND_API_KEY environment variable');
         }
 
-        // Using the built-in 'gmail' service preset
-        // This automatically handles host, port, and security settings
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: { user, pass },
-            // Increase timeout to 20 seconds
-            connectionTimeout: 20000,
-            greetingTimeout: 20000,
-            socketTimeout: 20000,
-            debug: true, // Enable debug logs
-            logger: true
+        log(`API Key found: ${apiKey.slice(0, 5)}...`);
+
+        const resend = new Resend(apiKey);
+        const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+
+        // Note: With 'onboarding@resend.dev', you can ONLY send to the email address 
+        // you used to sign up for Resend.
+        // If you want to send to others, you must verify a domain in Resend.
+        const to = process.env.SMTP_USER || 'thamaraiselvanvcb@gmail.com';
+
+        log(`Sending test email From: ${from} To: ${to}`);
+
+        const { data, error } = await resend.emails.send({
+            from,
+            to: [to],
+            subject: 'Render Production Email (via Resend)',
+            html: '<h3>✅ It Works!</h3><p>Your app is now using Resend API to bypass SMTP blocks.</p>'
         });
 
-        log('Verifying connection (20s timeout)...');
+        if (error) {
+            log(`❌ Resend API Error: ${error.message} (${error.name})`);
+            throw new Error(error.message);
+        }
 
-        await new Promise((resolve, reject) => {
-            transporter.verify((err, success) => {
-                if (err) reject(err);
-                else resolve(success);
-            });
-        });
-
-        log('✅ Connection Verified!');
-
-        // Send Email
-        log('Sending Test Email...');
-        const info = await transporter.sendMail({
-            from: `"Debug Service" <${user}>`,
-            to: user,
-            subject: 'Render Production Email (Service Mode)',
-            text: 'If you received this, the service: "gmail" configuration works.',
-            html: `<h3>✅ Service Mode Successful</h3><p>Your email is working using the Gmail preset.</p>`
-        });
-
-        log(`✅ Email Sent! ID: ${info.messageId}`);
+        log(`✅ Email Sent! ID: ${data.id}`);
         res.send(`<h3>✅ SUCCESS</h3><pre>${logs.join('\n')}</pre>`);
 
     } catch (error) {
         log(`\n❌ ERROR: ${error.message}`);
-        let code = error.code || 'N/A';
-        res.status(500).send(`<h3>❌ FAILED</h3>
-        <p><strong>Code:</strong> ${code}</p>
-        <p><strong>Message:</strong> ${error.message}</p>
-        <pre>${logs.join('\n')}</pre>
-        <hr>
-        <pre>${error.stack}</pre>`);
+        res.status(500).send(`<h3>❌ FAILED</h3><pre>${logs.join('\n')}</pre>`);
     }
 });
 

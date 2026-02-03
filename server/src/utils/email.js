@@ -1,55 +1,49 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create transporter only if SMTP is configured
-let transporter = null;
-
-const getTransporter = () => {
-    if (!transporter && process.env.SMTP_USER && process.env.SMTP_PASS) {
-        transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            },
-            // Increase timeouts to handle slow cloud networks
-            connectionTimeout: 20000,
-            greetingTimeout: 20000,
-            socketTimeout: 20000
-        });
-    }
-    return transporter;
-};
+// Initialize Resend
+// Note: It's okay if RESEND_API_KEY is not set immediately, but sendEmail will fail.
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Send email helper
 export const sendEmail = async ({ to, subject, html, text }) => {
-    // Skip if SMTP not configured
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.log('📧 Email skipped (SMTP not configured):', { to, subject });
+    // Validation
+    if (!process.env.RESEND_API_KEY) {
+        console.error('❌ Resend API Key is missing');
         return null;
     }
 
-    const mailer = getTransporter();
-    if (!mailer) {
-        console.log('📧 Email skipped (transporter not available):', { to, subject });
+    if (!resend) {
+        console.error('❌ Resend client is not initialized');
         return null;
     }
 
     try {
-        const info = await mailer.sendMail({
-            from: `"Task Management System" <${process.env.SMTP_USER}>`,
-            to,
+        const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+
+        console.log(`📧 Sending email via Resend to: ${to}`);
+
+        const { data, error } = await resend.emails.send({
+            from,
+            to: Array.isArray(to) ? to : [to],
             subject,
-            text: text || '',
-            html: html || ''
+            html: html || text,
+            text: text || ''
         });
 
-        console.log('📧 Email sent:', info.messageId);
-        return info;
+        if (error) {
+            console.error('❌ Resend Error:', error);
+            throw new Error(error.message);
+        }
+
+        console.log('✅ Email sent successfully via Resend. ID:', data.id);
+        return data;
     } catch (error) {
-        console.error('📧 Email failed:', error.message);
+        console.error('❌ Failed to send email:', error.message);
+        // Important: Don't crash the server, but log the error clearly
+        // Re-throw if you want the caller to handle it
         throw error;
     }
 };
