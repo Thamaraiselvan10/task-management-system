@@ -1,49 +1,73 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Resend
-// Note: It's okay if RESEND_API_KEY is not set immediately, but sendEmail will fail.
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const OAuth2 = google.auth.OAuth2;
 
-// Send email helper
-export const sendEmail = async ({ to, subject, html, text }) => {
-    // Validation
-    if (!process.env.RESEND_API_KEY) {
-        console.error('❌ Resend API Key is missing');
-        return null;
-    }
-
-    if (!resend) {
-        console.error('❌ Resend client is not initialized');
-        return null;
-    }
-
+const createTransporter = async () => {
     try {
-        const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+        const oauth2Client = new OAuth2(
+            process.env.GMAIL_CLIENT_ID,
+            process.env.GMAIL_CLIENT_SECRET,
+            "https://developers.google.com/oauthplayground"
+        );
 
-        console.log(`📧 Sending email via Resend to: ${to}`);
-
-        const { data, error } = await resend.emails.send({
-            from,
-            to: Array.isArray(to) ? to : [to],
-            subject,
-            html: html || text,
-            text: text || ''
+        oauth2Client.setCredentials({
+            refresh_token: process.env.GMAIL_REFRESH_TOKEN
         });
 
-        if (error) {
-            console.error('❌ Resend Error:', error);
-            throw new Error(error.message);
+        const accessToken = await new Promise((resolve, reject) => {
+            oauth2Client.getAccessToken((err, token) => {
+                if (err) {
+                    console.error('❌ Failed to create access token:', err);
+                    reject(err);
+                }
+                resolve(token);
+            });
+        });
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                type: 'OAuth2',
+                user: process.env.EMAIL_USER,
+                clientId: process.env.GMAIL_CLIENT_ID,
+                clientSecret: process.env.GMAIL_CLIENT_SECRET,
+                refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+                accessToken: accessToken || '' // Sometimes redundant but good for debug
+            }
+        });
+
+        return transporter;
+    } catch (error) {
+        console.error('❌ Error creating OAuth2 transporter:', error);
+        return null;
+    }
+};
+
+export const sendEmail = async ({ to, subject, html, text }) => {
+    try {
+        const transporter = await createTransporter();
+
+        if (!transporter) {
+            throw new Error('Failed to create email transporter');
         }
 
-        console.log('✅ Email sent successfully via Resend. ID:', data.id);
-        return data;
+        const mailOptions = {
+            from: `"Task Management System" <${process.env.EMAIL_USER}>`,
+            to,
+            subject,
+            text: text || '',
+            html: html || text
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ Email sent via Gmail OAuth2:', info.messageId);
+        return info;
     } catch (error) {
-        console.error('❌ Failed to send email:', error.message);
-        // Important: Don't crash the server, but log the error clearly
-        // Re-throw if you want the caller to handle it
+        console.error('❌ Failed to send email:', error);
         throw error;
     }
 };

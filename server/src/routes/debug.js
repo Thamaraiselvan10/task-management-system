@@ -1,7 +1,9 @@
 import express from 'express';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 
 const router = express.Router();
+const OAuth2 = google.auth.OAuth2;
 
 router.get('/', async (req, res) => {
     let logs = [];
@@ -11,44 +13,79 @@ router.get('/', async (req, res) => {
     };
 
     try {
-        log('Starting Resend API Diagnostic...');
+        log('Starting Gmail OAuth2 Diagnostic...');
 
-        const apiKey = process.env.RESEND_API_KEY;
+        const clientId = process.env.GMAIL_CLIENT_ID;
+        const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+        const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+        const user = process.env.EMAIL_USER;
 
-        if (!apiKey) {
-            throw new Error('Missing RESEND_API_KEY environment variable');
+        if (!clientId || !clientSecret || !refreshToken || !user) {
+            throw new Error('Missing Gmail OAuth credentials in .env');
         }
 
-        log(`API Key found: ${apiKey.slice(0, 5)}...`);
+        log(`Client ID: ${clientId.slice(0, 10)}...`);
+        log(`User: ${user}`);
 
-        const resend = new Resend(apiKey);
-        const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+        // 1. Get Access Token
+        log('1. Fetching Access Token from Google...');
+        const oauth2Client = new OAuth2(
+            clientId,
+            clientSecret,
+            "https://developers.google.com/oauthplayground"
+        );
 
-        // Note: With 'onboarding@resend.dev', you can ONLY send to the email address 
-        // you used to sign up for Resend.
-        // If you want to send to others, you must verify a domain in Resend.
-        const to = process.env.SMTP_USER || 'thamaraiselvanvcb@gmail.com';
-
-        log(`Sending test email From: ${from} To: ${to}`);
-
-        const { data, error } = await resend.emails.send({
-            from,
-            to: [to],
-            subject: 'Render Production Email (via Resend)',
-            html: '<h3>✅ It Works!</h3><p>Your app is now using Resend API to bypass SMTP blocks.</p>'
+        oauth2Client.setCredentials({
+            refresh_token: refreshToken
         });
 
-        if (error) {
-            log(`❌ Resend API Error: ${error.message} (${error.name})`);
-            throw new Error(error.message);
-        }
+        const accessToken = await new Promise((resolve, reject) => {
+            oauth2Client.getAccessToken((err, token) => {
+                if (err) {
+                    log(`❌ Access Token Error: ${err.message}`);
+                    reject(err);
+                } else {
+                    log('✅ Access Token Generated!');
+                    resolve(token);
+                }
+            });
+        });
 
-        log(`✅ Email Sent! ID: ${data.id}`);
+        // 2. Configure Nodemailer
+        log('2. Configuring Transport...');
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                type: 'OAuth2',
+                user: user,
+                clientId: clientId,
+                clientSecret: clientSecret,
+                refreshToken: refreshToken,
+                accessToken: accessToken
+            }
+        });
+
+        // 3. Verify
+        log('3. Verifying SMTP Connection...');
+        await transporter.verify();
+        log('✅ Connection Verified!');
+
+        // 4. Send Email
+        log('4. Sending Test Email...');
+        const info = await transporter.sendMail({
+            from: `"Gmail OAuth Debug" <${user}>`,
+            to: user, // Send to self
+            subject: 'Render Production Email (Gmail API)',
+            text: 'If you see this, Gmail OAuth2 is working perfectly via API!',
+            html: '<h3>✅ Gmail OAuth2 Works!</h3><p>Your app is now authenticated directly with Google.</p>'
+        });
+
+        log(`✅ Email Sent! ID: ${info.messageId}`);
         res.send(`<h3>✅ SUCCESS</h3><pre>${logs.join('\n')}</pre>`);
 
     } catch (error) {
         log(`\n❌ ERROR: ${error.message}`);
-        res.status(500).send(`<h3>❌ FAILED</h3><pre>${logs.join('\n')}</pre>`);
+        res.status(500).send(`<h3>❌ FAILED</h3><pre>${logs.join('\n')}</pre><hr><pre>${error.stack}</pre>`);
     }
 });
 
