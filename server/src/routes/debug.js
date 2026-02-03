@@ -24,7 +24,9 @@ router.get('/', async (req, res) => {
             throw new Error('Missing Gmail OAuth credentials in .env');
         }
 
-        log(`Client ID: ${clientId.slice(0, 10)}...`);
+        log(`Client ID: "${clientId.slice(0, 5)}...${clientId.slice(-5)}" (Length: ${clientId.length})`);
+        log(`Client Secret: "${clientSecret.slice(0, 3)}...${clientSecret.slice(-3)}" (Length: ${clientSecret.length})`);
+        log(`Refresh Token: "${refreshToken.slice(0, 5)}...${refreshToken.slice(-5)}" (Length: ${refreshToken.length})`);
         log(`User: ${user}`);
 
         // 1. Get Access Token
