@@ -41,7 +41,7 @@ export default function Login() {
             <div className="login-brand-section">
                 <div className="brand-content">
                     <img src="/kiot-logo.png" alt="KIOT Logo" className="brand-logo-img" />
-                    <h1 className="brand-logo-text">Placement Task Tracker</h1>
+                    <h1 className="brand-logo-text">PAT Team Task Tracker</h1>
                     <p className="brand-subtitle">
                         Kiot - Placement and Industrial Relations
                     </p>

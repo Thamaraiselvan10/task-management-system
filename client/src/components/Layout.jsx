@@ -25,7 +25,7 @@ export default function Layout() {
                         <img src="/kiot-logo.png" alt="KIOT Logo" />
                     </div>
                     <div className="header-title-group">
-                        <h1>Placement Task Tracker</h1>
+                        <h1>PAT Team Task Tracker</h1>
                         <span className="header-subtitle">Kiot - Placement & IR</span>
                     </div>
                 </div>
