@@ -10,7 +10,7 @@ A complete task and work management application for college administration. Buil
 
 ### 1. Setup Database
 
-Create a PostgreSQL database and run the schema:
+Create a PostgreSQL database and run the schema :
 
 ```sql
 -- Copy contents from server/src/db/schema.sql
