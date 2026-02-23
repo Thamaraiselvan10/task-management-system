@@ -76,7 +76,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
 
         sendEmail({
             to: email,
-            subject: 'Welcome to Task Management System - Your Account Details',
+            subject: 'Welcome to PAT Team Task Tracker - Your Account Details',
             html: emailHtml
         }).catch(err => console.error('📧 Failed to send welcome email:', err));
 

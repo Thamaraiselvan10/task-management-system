@@ -154,7 +154,7 @@ router.post('/', authenticate, isAdmin, async (req, res) => {
 
             sendEmail({
                 to: assignee.email,
-                subject: `New Task Assigned: ${title}`,
+                subject: `New Task Assigned: ${title} | PAT Team Task Tracker`,
                 html: emailHtml
             }).catch(err => console.error('Failed to send task notification:', err));
         }
@@ -234,7 +234,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
                         sendEmail({
                             to: creator.email,
-                            subject: `Task Completed: ${existingTask.rows[0].title}`,
+                            subject: `Task Completed: ${existingTask.rows[0].title} | PAT Team Task Tracker`,
                             html: emailHtml
                         }).catch(err => console.error('Failed to send completion email:', err));
                     }

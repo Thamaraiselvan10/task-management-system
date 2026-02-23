@@ -1,7 +1,7 @@
 // Helper for common footer
 const getFooter = () => `
     <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-        <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} Task Management System. All rights reserved.</p>
+        <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} PAT Team Task Tracker. All rights reserved.</p>
     </div>
 `;
 
@@ -36,7 +36,7 @@ const getBaseLayout = (headerTitle, content) => `
 export const getWelcomeEmailTemplate = ({ name, email, password, loginUrl }) => {
     const content = `
         <h2 style="color: #1f2937; margin-top: 0; margin-bottom: 20px; font-size: 20px;">Welcome Aboard, ${name}!</h2>
-        <p style="margin-bottom: 20px; color: #4b5563;">Your account has been successfully created by the administrator. You can now access the Task Management System to track your tasks and collaborate with your team.</p>
+        <p style="margin-bottom: 20px; color: #4b5563;">Your account has been successfully created by the administrator. You can now access the PAT Team Task Tracker to track your tasks and collaborate with your team.</p>
         
         <div style="background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; margin-bottom: 30px;">
             <p style="margin: 0 0 10px 0; font-size: 14px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Your Login Credentials</p>
@@ -56,7 +56,7 @@ export const getWelcomeEmailTemplate = ({ name, email, password, loginUrl }) => 
 
         <p style="color: #6b7280; font-size: 14px;"><strong>Note:</strong> For security reasons, we recommend changing your password after your first login.</p>
     `;
-    return getBaseLayout('Task Management System', content);
+    return getBaseLayout('PAT Team Task Tracker', content);
 };
 
 export const getTaskAssignedEmailTemplate = ({ name, title, description, priority, deadline, taskUrl }) => {

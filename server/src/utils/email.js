@@ -47,7 +47,7 @@ export const sendEmail = async ({ to, subject, html, text }) => {
             throw new Error('EMAIL_USER is not defined in .env');
         }
 
-        const raw = makeBody(to, `"Task Management System" <${user}>`, subject, html || text);
+        const raw = makeBody(to, `"PAT Team Task Tracker" <${user}>`, subject, html || text);
 
         const response = await gmail.users.messages.send({
             userId: 'me',
