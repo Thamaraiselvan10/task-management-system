@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 
 const router = express.Router();
+//  api function starts here
+
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
